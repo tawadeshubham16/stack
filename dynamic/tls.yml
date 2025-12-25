@@ -1,0 +1,4 @@
+tls:
+  certificates:
+    - certFile: /run/secrets/cloudflare_origin_crt
+      keyFile: /run/secrets/cloudflare_origin_key
