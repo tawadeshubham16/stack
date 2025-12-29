@@ -1,0 +1,101 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER_FILE: /run/secrets/postgres_username
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: app
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$(cat /run/secrets/postgres_username)\" -d app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    secrets:
+      - postgres_username
+      - postgres_password
+    networks:
+      - db
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          memory: 512M
+    stop_grace_period: 1m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ""
+      PGADMIN_DEFAULT_PASSWORD: ""
+      PGADMIN_CONFIG_ENHANCED_COOKIE_PROTECTION: "True"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export PGADMIN_DEFAULT_EMAIL=$$(cat /run/secrets/pgadmin_default_email); \
+        export PGADMIN_DEFAULT_PASSWORD=$$(cat /run/secrets/pgadmin_default_password); \
+        exec /entrypoint.sh
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    secrets:
+      - pgadmin_default_email
+      - pgadmin_default_password
+    networks:
+      - db
+      - traefik-public
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+        delay: 10s
+        max_attempts: 5
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.pgadmin.rule=Host(`${PGADMIN_DOMAIN}`)
+        - traefik.http.routers.pgadmin.entrypoints=websecure
+        - traefik.http.routers.pgadmin.tls=true
+        - traefik.http.services.pgadmin.loadbalancer.server.port=80
+
+networks:
+  db:
+    driver: overlay
+  traefik-public:
+    external: true
+
+volumes:
+  postgres_data:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+secrets:
+  postgres_username:
+    external: true
+  postgres_password:
+    external: true
+  pgadmin_default_email:
+    external: true  
+  pgadmin_default_password:
+    external: true
