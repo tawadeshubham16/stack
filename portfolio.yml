@@ -1,0 +1,38 @@
+version: "3.8"
+
+services:
+  portfolio_frontend:
+    image: ghcr.io/tawadeshubham16/portfolio-frontend:main
+    networks:
+      - traefik-public
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.http.routers.portfolio-frontend.rule=Host(`${PORTFOLIO_FRONTEND_HOST}`)
+        - traefik.http.routers.portfolio-frontend.entrypoints=websecure
+        - traefik.http.routers.portfolio-frontend.tls=true
+        - traefik.http.routers.portfolio-frontend.middlewares=portfolio-frontend-strip
+        - traefik.http.middlewares.portfolio-frontend-strip.stripprefix.prefixes=/
+        - traefik.http.services.portfolio-frontend.loadbalancer.server.port=80
+
+  portfolio_backend:
+    image: ghcr.io/tawadeshubham16/portfolio-backend:main
+    networks:
+      - traefik-public
+      - db
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.docker.network=traefik-public
+        - traefik.http.routers.portfolio-backend.rule=Host(`${PORTFOLIO_BACKEND_DOMAIN}`)
+        - traefik.http.routers.portfolio-backend.entrypoints=websecure
+        - traefik.http.routers.portfolio-backend.tls=true
+        - traefik.http.services.portfolio-backend.loadbalancer.server.port=8080
+        
+networks:
+  traefik-public:
+    external: true
+  db:
+    external: true
+    name: postgres_db
